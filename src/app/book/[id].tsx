@@ -12,6 +12,13 @@ import {
 
 import { Colors } from "@/constants/theme";
 import { books } from "@/data/books";
+
+import {
+  addBookToLibrary,
+  getLibraryBookById,
+  removeBookFromLibrary
+} from "@/data/library";
+
 export default function BookDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
@@ -28,71 +35,50 @@ export default function BookDetailsScreen() {
     const book = books.find((item) => item.id === id);
 
     useEffect (() => {
+      if (!book) return;
+
       let isActive = true;
 
-      async function checkSavedBook() {
-        if (!book) return;
-
+      const checkSavedBook = async () => {
         try {
-          const savedBook = await db.getFirstAsync<{ id: string }>(
-            'SELECT id FROM library_books WHERE id = ?',
-            book.id
-          );
-
+          const savedBook = await getLibraryBookById(db, book.id);
+          
           if (isActive) {
             setIsSaved(savedBook !== null);
           }
         } catch (error) {
-            console.error(
-              'Kirjan tarkistaminen epäonnistui:', 
-              error
-            );
-          }
+          console.error('Kirjan tarkistaminen epäonnistui:', error);
         }
+      };
         
-        checkSavedBook();
+      checkSavedBook();
 
-        return () => {
-          isActive = false;
-        };
-      }, [db, book?.id]);
+      return () => {
+        isActive = false;
+      };
+    }, [db, book]);
 
-    async function handleAddToLibrary() {
-      if (!book || isSaved || isSaving) return;
-
-      setIsSaving(true);
-      setSaveMessage('');
+    const handleAddToLibrary = async () => {
+      if (!book) return;
 
       try {
-        const result = await db.runAsync(
-          `INSERT OR IGNORE INTO library_books
-          (id, title, author, year, description, status)
-          VALUES (?, ?, ?, ?, ?, ?)`,
-          book.id,
-          book.title,
-          book.author,
-          book.year,
-          book.description,
-          'Lukulistalla'
-        );
-
+        await addBookToLibrary(db, book);
         setIsSaved(true);
-
-        if (result.changes > 0) {
-          setSaveMessage('Kirja lisättiin kirjahyllyyn!');
-        } else {
-          setSaveMessage('Kirja on kirjahyllyssä.');
-        }
       } catch (error) {
-        console.error(
-          'Kirjan tallentaminen epäonnistui:',
-          error
-        );
-        setSaveMessage('Kirjan tallentaminen epäonnistui.');
-      } finally {
-        setIsSaving(false);
+        console.error('Kirjan lisääminen epäonnistui:', error);
       }
-    }
+    };
+
+    const handleRemoveFromLibrary = async () => {
+      if (!book) return;
+
+      try {
+        await removeBookFromLibrary(db, book.id);
+        setIsSaved(false);
+      } catch (error) {
+        console.error('Kirjan poistaminen epäonnistui:', error)
+      }
+    };
 
     //Kirjan ouuttumisen takristus tulee tähän.
     if (!book) {
@@ -115,27 +101,34 @@ export default function BookDetailsScreen() {
                 Kirjan tunniste: {id}
             </Text>
 
-            <Pressable
-              style={[
-                styles.addButton,
-                isSaved && styles.addButtonSaved,
-              ]}
-              onPress={handleAddToLibrary}
-              disabled={isSaving || isSaved}
-            >
-              <Text
+            {isSaved ? (
+              <Pressable
                 style={[
-                  styles.addButtonText,
-                  isSaved && styles.addButtonSavedText,
+                  styles.addButton,
+                  styles.addButtonSaved,
                 ]}
+                onPress={handleRemoveFromLibrary}
               >
-                {isSaving
-                  ? 'Tallennetaan...'
-                  : isSaved
-                    ? '✓ Kirjahyllyssä'
-                  : 'Lisää kirjahyllyyn'}
-              </Text>
-            </Pressable>
+                <Text
+                  style={[
+                    styles.addButtonText,
+                    styles.addButtonSavedText,
+                  ]}
+                >
+                  Poista kirjahyllystä
+                </Text>
+              </Pressable>
+            ): (
+              <Pressable
+                style={styles.addButton}
+                onPress={handleAddToLibrary}
+                disabled={isSaving}
+              >
+                <Text style={styles.addButtonText}>
+                  {isSaving ? 'Tallennetaan...' : 'Lisää kirjahyllyyn'}
+                </Text>
+              </Pressable>
+            )}
 
             {saveMessage !== '' && (
               <Text style={styles.saveMessage}>

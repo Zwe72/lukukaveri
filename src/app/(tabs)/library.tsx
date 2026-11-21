@@ -2,17 +2,13 @@ import { Colors } from "@/constants/theme";
 import { useFocusEffect } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { useCallback, useState } from "react";
-import { ScrollView, StyleSheet, Text, useColorScheme, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from "react-native";
 
-type LibraryBook = {
-  id: string;
-  title: string;
-  author: string;
-  year: string | null;
-  description: string | null;
-  status: string;
-  added_at: string;
-}
+import {
+  getLibraryBooks,
+  removeBookFromLibrary,
+  type LibraryBook
+} from "@/data/library";
 
 export default function LibraryScreen() {
   const db = useSQLiteContext();
@@ -29,32 +25,28 @@ export default function LibraryScreen() {
     useCallback(() => {
       let isActive = true;
 
-      async function loadBooks() {
-        setIsLoading(true);
-        setError(null);
-
+      const loadBooks = async () => {
         try {
-          const savedBooks = await db.getAllAsync<LibraryBook>(
-            `SELECT id, title, author, year, description, status, added_at
-            FROM library_books
-            ORDER BY added_at DESC`
-          );
+          setIsLoading(true);
+          setError('');
 
-          if (isActive) {
+          const savedBooks = await getLibraryBooks(db);
+
+          if(isActive) {
             setBooks(savedBooks);
           }
         } catch (error) {
           console.error('Kirjojen hakeminen epäonnistui:', error);
 
-          if(isActive) {
-            setError('Kirjojen hakeminen epäonnistui.');
+          if (isActive) {
+            setError('Kirjojen lataaminen epäonnistui.');
           }
         } finally {
           if (isActive) {
             setIsLoading(false);
           }
         }
-      }
+      };
 
       loadBooks();
 
@@ -63,6 +55,18 @@ export default function LibraryScreen() {
       };
     }, [db])
   );
+
+  const handleRemoveBook = async (bookId: string) => {
+    try {
+      await removeBookFromLibrary(db, bookId);
+
+      setBooks((currentBooks) =>
+        currentBooks.filter((book) => book.id !== bookId)
+      );
+    } catch (error) {
+      console.error('Kirjan poistaminen epäonnistui:', error);
+    }
+  };
 
   return (
     <ScrollView
@@ -130,6 +134,11 @@ export default function LibraryScreen() {
                     {book.status}
                   </Text>
                 </View>
+
+                {/* Kirjan poistaminen */}
+                <Pressable onPress={() => handleRemoveBook(book.id)}>
+                  <Text>Poista</Text>
+                </Pressable>
               </View>
             </View>
           ))}
