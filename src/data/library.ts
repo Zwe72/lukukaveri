@@ -51,7 +51,7 @@ export async function getLibraryBooks(
     return await db.getAllAsync<LibraryBook>(
         `SELECT *
         FROM library_books
-        ORDER BY added_at DESC`
+        ORDER BY added_at DESC, rowid DESC`
     );
 }
 

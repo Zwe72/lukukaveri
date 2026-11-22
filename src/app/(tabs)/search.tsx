@@ -201,7 +201,7 @@ const createStyles = (
 ) =>
   StyleSheet.create({
     screen: {
-      flexGrow: 1,
+      flex: 1,
       backgroundColor: colors.background,
       padding: 24,
       paddingTop: 40,
@@ -233,7 +233,7 @@ const createStyles = (
       borderColor: colors.border,
       borderRadius: 14,
       paddingHorizontal: 14,
-      marginBottom: 24,
+      marginBottom: 16,
     },
     searchIcon: {
       fontSize: 24,
@@ -241,14 +241,16 @@ const createStyles = (
       marginRight: 10,
     },
     scanButton: {
+      alignSelf: 'center',
       backgroundColor: colors.backgroundElement,
-      padding: 14,
-      borderRadius: 12,
-      alignItems: 'center',
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: 10,
+      marginBottom: 4,
     },
     scanButtonText: {
       color: colors.text,
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: '600',
     },
     input: {

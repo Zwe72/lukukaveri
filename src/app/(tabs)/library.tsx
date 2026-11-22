@@ -208,18 +208,41 @@ export default function LibraryScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Avaa kirjan ${book.title} tiedot`}
                 >
+                  {/* Kirjan nimi */}
                   <Text style={styles.bookTitle}>
                     {book.title}
                   </Text>
                 </Pressable>
 
+                {/* Kirjailijan nimi */}
                 <Text style={styles.author}>
                   {book.author}
                 </Text>
 
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>
-                    {book.status}
+                {/* Kirjan arvosana */}
+                <View style={styles.ratingDisplay}>
+                  <View style={styles.ratingStars}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Text
+                        key={star}
+                        style={[
+                          styles.ratingStar,
+                          book.rating !== null &&
+                            star <= book.rating &&
+                            styles.ratingStarActive,
+                        ]}
+                      >
+                        {book.rating !== null && star <= book.rating
+                          ? '★'
+                          : '☆'}
+                      </Text>
+                    ))}
+                  </View>
+
+                  <Text style={styles.ratingText}>
+                    {book.rating !== null
+                      ? `${book.rating}/5`
+                      : 'Ei arviota'}
                   </Text>
                 </View>
 
@@ -261,8 +284,15 @@ export default function LibraryScreen() {
                 </View>
 
                 {/* Kirjan poistaminen */}
-                <Pressable onPress={() => handleRemoveBook(book.id)}>
-                  <Text>Poista</Text>
+                <Pressable 
+                  style={styles.removeButton}
+                  onPress={() => handleRemoveBook(book.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Poista kirja ${book.title} kirjahyllystä`}
+                >
+                  <Text style={styles.removeButtonText}>
+                    Poista kirjahyllystä
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -358,32 +388,18 @@ StyleSheet.create({
       fontSize: 13,
       color: colors.textSecondary,
     },
-    statusBadge: {
-      backgroundColor: colors.backgroundElement,
-      alignSelf: 'flex-start',
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 8,
-    },
-    statusText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.primary,
-    },
     statusLabel: {
       color: colors.textSecondary,
       fontSize: 13,
       fontWeight: '600',
       marginTop: 8,
     },
-
     statusOptions: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 7,
       marginTop: 6,
     },
-
     statusOption: {
       paddingHorizontal: 10,
       paddingVertical: 8,
@@ -392,21 +408,56 @@ StyleSheet.create({
       borderColor: colors.border,
       backgroundColor: colors.card,
     },
-
     statusOptionActive: {
       backgroundColor: colors.backgroundSelected,
       borderColor: colors.primary,
     },
-
     statusOptionText: {
       color: colors.textSecondary,
       fontSize: 12,
       fontWeight: '500',
     },
-
     statusOptionTextActive: {
       color: colors.text,
       fontWeight: '700',
+    },
+    ratingDisplay: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 4,
+    },
+    ratingStars: {
+      flexDirection: 'row',
+      gap: 2,
+    },
+    ratingStar: {
+      fontSize: 15,
+      color: colors.textSecondary,
+    },
+    ratingStarActive: {
+      color: colors.primary,
+    },
+    ratingText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    removeButton: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.backgroundElement,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      minHeight: 42,
+      justifyContent: 'center',
+      borderRadius: 8,
+      marginTop: 6,
+    },
+    removeButtonText: {
+      color: colors.text,
+      fontSize: 12,
+      fontWeight: '500',
     },
      emptyText: {
       fontSize: 14,

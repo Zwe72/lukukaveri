@@ -1,15 +1,31 @@
 import { Colors } from '@/constants/theme';
 import { getLibraryBooks, LibraryBook } from '@/data/library';
+import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+
+import {
+  Appearance,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View
+} from 'react-native';
 
 export default function HomeScreen() {
   const router = useRouter();
+
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
   const styles = createStyles(colors);
+  const isDark = colorScheme === 'dark';
+
+  const toggleTheme = () => {
+    Appearance.setColorScheme(isDark ? 'light' : 'dark');
+  };
 
   const db = useSQLiteContext();
 
@@ -36,39 +52,68 @@ export default function HomeScreen() {
 
           if (isActive) {
           setError('Kirjahyllyn lataaminen epäonnistui.');
+          }
+        } finally {
+          if (isActive) {
+            setIsLoading(false);
+          }
         }
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      }
-    };
+      };
 
-    loadBooks();
+      loadBooks();
 
-    return () => {
-      isActive = false;
-    };
-  }, [db])
-);
+      return () => {
+        isActive = false;
+      };
+    },  [db])
+  );
 
-const currentlyReading = books.find(
-  (book) => book.status === 'Kesken'
-);
+  const currentlyReading = books.find(
+    (book) => book.status === 'Kesken'
+  );
 
+  const latestAdded = books[0];
+
+  const openBook = (book: LibraryBook) => {
+    router.push({
+      pathname: '/book/[id]',
+      params: {
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        year: book.year ?? '',
+        coverId: book.cover_id != null
+          ? String(book.cover_id)
+          : '',
+        isbn: book.isbn ?? '',
+      },
+    });
+  };
+  
   return (
     <ScrollView
     style={styles.screen}
     contentContainerStyle={styles.content}
     showsVerticalScrollIndicator={false}
     >
-      {/* Otsikko */}
+      {/* Otsikko ja teeman vaihto*/}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerText}>
           <Text style={styles.brand}>LUKUKAVERI</Text>
           <Text style={styles.title}>Hei, lukija!</Text>
           <Text style={styles.subtitle}>Mitä lukisit tänään?</Text>
         </View>
+        
+        <Pressable
+          style={styles.themeButton}
+          onPress={toggleTheme}
+          accessibilityRole="button"
+          accessibilityLabel="Vaihda väriteemaa"
+        >
+          <Text style={styles.themeIcon}>
+            {colorScheme === 'dark' ? '☀️' : '🌙'}
+          </Text>
+        </Pressable>
       </View>
 
       {/* Kirjahaku */}
@@ -96,7 +141,7 @@ const currentlyReading = books.find(
       {/* Kirjojen lataaminen */}
       {isLoading ? (
         <Text style={styles.progressText}>
-          Ladataan kirajhyllyä...
+          Ladataan kirjahyllyä...
         </Text>
       ) : error ? (
         <Text style={styles.progressText}>
@@ -105,24 +150,23 @@ const currentlyReading = books.find(
       ) : currentlyReading ? (
         <Pressable
         style={styles.bookCard}
-          onPress={() =>
-            router.push({
-              pathname: '/book/[id]',
-              params: {
-                id: currentlyReading.id,
-                title: currentlyReading.title,
-                author: currentlyReading.author,
-                year: currentlyReading.year ?? '',
-                coverId: '',
-                isbn: '',
-              },
-            })
-          }
+          onPress={() => openBook(currentlyReading)}
         >
+          {/* Kirjan kansi */}
           <View style={styles.bookCover}>
-            <Text style={styles.coverTitle}>
-            📖
-            </Text>
+            {currentlyReading.cover_id ? (
+              <Image
+                source={{
+                  uri: `https://covers.openlibrary.org/b/id/${currentlyReading.cover_id}-M.jpg`,
+                }}
+                style={styles.bookCoverImage}
+                contentFit="contain"
+                cachePolicy="disk"
+                transition={150}
+              />
+            ) : (
+              <Text style={styles.coverTitle}>📖</Text>
+            )}
           </View>
 
           <View style={styles.bookInfo}>
@@ -150,6 +194,63 @@ const currentlyReading = books.find(
       </Text>
     )}
 
+    {/* Viimeksi lisätty kirja */}
+    {!isLoading &&
+      !error &&
+      latestAdded &&
+      latestAdded.id !== currentlyReading?.id && (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              Viimeksi lisätty
+            </Text>
+
+            <Pressable onPress={() => router.push('/library')}>
+              <Text style={styles.link}>Kirjahylly →</Text>
+            </Pressable>
+          </View>
+
+          <Pressable
+            style={styles.bookCard}
+            onPress={() => openBook(latestAdded)}
+          >
+            <View style={styles.bookCover}>
+              {latestAdded.cover_id ? (
+                <Image
+                  source={{
+                    uri: `https://covers.openlibrary.org/b/id/${latestAdded.cover_id}-M.jpg`,
+                  }}
+                  style={styles.bookCoverImage}
+                  contentFit="contain"
+                  cachePolicy="disk"
+                  transition={150}
+                />
+              ) : (
+                <Text style={styles.coverTitle}>📖</Text>
+              )}
+            </View>
+
+            <View style={styles.bookInfo}>
+              <Text style={styles.bookTitle}>
+                {latestAdded.title}
+              </Text>
+
+              <Text style={styles.author}>
+                {latestAdded.author}
+              </Text>
+
+              <Text style={styles.status}>
+                {latestAdded.status}
+              </Text>
+
+              <Text style={styles.progressText}>
+                Avaa kirjan tiedot →
+              </Text>
+            </View>
+          </Pressable>
+        </>
+     )}
+
       {/* Löydä uutta luettavaa */}
       <View style={styles.discoverCard}>
         <Text style={styles.sectionTitle}>
@@ -169,26 +270,27 @@ const currentlyReading = books.find(
             Etsi kirjoja
           </Text>
         </Pressable>
+      </View>
 
         {/* Lukumuistutukset */}
         <Pressable
-          style={styles.discoverCard}
+          style={styles.reminderButton}
           onPress={() => router.push('/reminders')}
         >
-          <Text style={styles.sectionTitle}>
+          <View style={styles.reminderInfo}>
+            <Text style={styles.reminderTitle}>
             🔔 Lukumuistutukset
-          </Text>
+            </Text>
 
-          <Text style={styles.discoverText}>
-            Aseta päivittäinen muistutus ja muista
-            ottaa aikaa lukemiselle.
-          </Text>
+            <Text style={styles.reminderSubtitle}>
+              Muista ottaa aikaa lukemiselle.
+            </Text>
+          </View>
 
-          <Text style={styles.primaryButtonText}>
-            Aseta muistutus →
+          <Text style={styles.reminderAction}>
+            Aseta →
           </Text>
         </Pressable>
-      </View>
     </ScrollView>
   )
 };
@@ -206,9 +308,6 @@ const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
       paddingBottom: 40,
       gap: 24,
     },
-    header: {
-      marginBottom: 4,
-    },
     brand: {
       fontSize: 12,
       fontWeight: 'bold',
@@ -220,6 +319,17 @@ const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
       fontSize: 28,
       fontWeight: 'bold',
       color: colors.text,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+    },
+    headerText: {
+      flex: 1,
+    },
+    themeIcon: {
+      fontSize: 23,
     },
     subtitle: {
       fontSize: 15,
@@ -243,6 +353,18 @@ const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
     arrow: {
       fontSize: 20,
       color: colors.primary,
+    },
+    themeButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: colors.backgroundElement,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 12,
+      marginTop: 14,
     },
     sectionHeader: {
       flexDirection: 'row',
@@ -271,18 +393,14 @@ const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
       height: 140,
       backgroundColor: colors.backgroundSelected,
       borderRadius: 8,
-      padding: 10,
-      justifyContent: 'space-between',
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    coverTitle: {
-      fontSize: 15,
-      fontWeight: 'bold',
-      color: colors.text,
-    },
-    coverAuthor: {
-      fontSize: 8,
-      color: colors.textSecondary,
-    },
+    bookCoverImage: {
+      width: '100%',
+      height: '100%',
+    }, 
     bookInfo: {
       flex: 1,
       justifyContent: 'center',
@@ -290,6 +408,11 @@ const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
     },
     bookTitle: {
       fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    coverTitle: {
+      fontSize: 15,
       fontWeight: 'bold',
       color: colors.text,
     },
@@ -305,18 +428,6 @@ const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
     progressText: {
       fontSize: 11,
       color: colors.textSecondary,
-    },
-    progressBar: {
-      height: 7,
-      backgroundColor: colors.border,
-      borderRadius: 10,
-      overflow: 'hidden',
-    },
-    progressFill: {
-      width: '55%',
-      height: '100%',
-      backgroundColor: colors.primary,
-      borderRadius: 10,
     },
     discoverCard: {
       backgroundColor: colors.backgroundElement,
@@ -336,6 +447,33 @@ const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
       alignItems: 'center',
     },
     primaryButtonText: {
+      color: colors.lightButtonText,
+      fontWeight: 'bold',
+      fontSize: 14,
+    },
+    reminderButton: {
+      backgroundColor: colors.primary,
+      padding: 18,
+      borderRadius: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    reminderInfo: {
+      flex: 1,
+      gap: 5,
+    },
+    reminderTitle: {
+      color: colors.lightButtonText,
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    reminderSubtitle: {
+      color: colors.lightButtonText,
+      fontSize: 13,
+    },
+    reminderAction: {
       color: colors.lightButtonText,
       fontWeight: 'bold',
       fontSize: 14,

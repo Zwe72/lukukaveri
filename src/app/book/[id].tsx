@@ -109,7 +109,7 @@ export default function BookDetailsScreen() {
 
       try {
         setIsSaving(true);
-        
+
         await addBookToLibrary(db, book);
         setIsSaved(true);
         setSaveMessage('Kirja lisättiin kirjahyllyyn!');
@@ -201,7 +201,7 @@ export default function BookDetailsScreen() {
       };
     }, [id, coverId]);
 
-    //Kirjan ouuttumisen takristus tulee tähän.
+    //Kirjan puuttumisen tarkistus.
     if (!book) {
       return (
         <View>
@@ -418,17 +418,14 @@ const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
   borderRadius: 12,
   alignItems: 'center',
 },
-
 addButtonSaved: {
   backgroundColor: colors.backgroundSelected,
 },
-
 addButtonText: {
   color: colors.lightButtonText,
   fontSize: 15,
   fontWeight: 'bold',
 },
-
 addButtonSavedText: {
   color: colors.text,
 },
@@ -442,7 +439,6 @@ coverImage: {
   width: 180,
   height: 260,
   alignSelf: 'center',
-  marginVertical: 20,
 },
 
 coverPlaceholder: {
@@ -453,7 +449,6 @@ coverPlaceholder: {
   justifyContent: 'center',
   backgroundColor: colors.backgroundElement,
   borderRadius: 10,
-  marginVertical: 20,
 },
 
 coverPlaceholderText: {
@@ -465,7 +460,6 @@ reviewSection: {
   padding: 18,
   borderRadius: 16,
   gap: 14,
-  marginTop: 12,
 },
 
 reviewTitle: {
