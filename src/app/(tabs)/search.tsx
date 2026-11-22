@@ -111,10 +111,20 @@ return (
             )}
           </View>
 
-        {/* Hakutulokset */}
-        <Text style={styles.resultCount}>
-          Hakutulokset ({searchResults.length})
-        </Text>
+          {/* ISBN-skannaus */}
+          <Pressable
+            style={styles.scanButton}
+            onPress={() => router.push('/scan')}
+          >
+            <Text style={styles.scanButtonText}>
+              📷 Skannaa kirjan viivakoodi
+            </Text>
+          </Pressable>
+
+          {/* Hakutulokset */}
+          <Text style={styles.resultCount}>
+            Hakutulokset ({searchResults.length})
+          </Text>
       </>
     }
     ItemSeparatorComponent={() => (
@@ -229,6 +239,17 @@ const createStyles = (
       fontSize: 24,
       color: colors.textSecondary,
       marginRight: 10,
+    },
+    scanButton: {
+      backgroundColor: colors.backgroundElement,
+      padding: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    scanButtonText: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: '600',
     },
     input: {
       flex: 1,

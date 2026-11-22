@@ -119,3 +119,63 @@ export async function getOpenLibraryWorkDetails(
         coverId: data.covers?.[0] ?? null,
     };  
 }
+
+// ISBN-haun hakutuloksen tietotyyppi
+type OpenLibraryIsbnDocument = {
+    key?: string;
+    title?: string;
+    author_name?: string[];
+    first_publish_year?: number;
+    cover_i?: number;
+};
+
+// ISBN-haun vastaustyyppi
+type OpenLibraryIsbnResponse = {
+    docs?: OpenLibraryIsbnDocument[];
+};
+
+//Kirjan hakeminen ISBN-tunnuksella
+export async function searchOpenLibraryByIsbn(
+    isbn: string,
+    signal?: AbortSignal
+): Promise<Book | null> {
+    const normalizedIsbn = isbn.replace(/[-\s]/g, '');
+
+    const query = `isbn:${normalizedIsbn}`;
+
+    const fields =
+        'key,title,author_name,first_publish_year,cover_i';
+    
+    const url =
+        `${OPEN_LIBRARY_URL}?q=${encodeURIComponent(query)}` +
+        `&fields=${encodeURIComponent(fields)}` +
+        '&limit=1';
+
+    const response = await fetch(url, { signal });
+
+    if (!response.ok) {
+        throw new Error(
+            `ISBN-haku epäonnistui: ${response.status}`
+        );
+    }
+
+    const data = (await response.json()) as OpenLibraryIsbnResponse;
+
+    const item = data.docs?.[0];
+
+    if (!item?.key || !item.title) {
+        return null;
+    }
+
+    return {
+        id: item.key.split('/').pop() ?? item.key,
+        title: item.title,
+        author: item.author_name?.join(', ') ?? 'Tuntematon kirjailija',
+        year: item.first_publish_year
+        ? String(item.first_publish_year)
+        : null,
+        description: null,
+        coverId: item.cover_i ?? null,
+        isbn: normalizedIsbn,
+    };
+}
