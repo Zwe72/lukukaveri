@@ -169,6 +169,25 @@ const currentlyReading = books.find(
             Etsi kirjoja
           </Text>
         </Pressable>
+
+        {/* Lukumuistutukset */}
+        <Pressable
+          style={styles.discoverCard}
+          onPress={() => router.push('/reminders')}
+        >
+          <Text style={styles.sectionTitle}>
+            🔔 Lukumuistutukset
+          </Text>
+
+          <Text style={styles.discoverText}>
+            Aseta päivittäinen muistutus ja muista
+            ottaa aikaa lukemiselle.
+          </Text>
+
+          <Text style={styles.primaryButtonText}>
+            Aseta muistutus →
+          </Text>
+        </Pressable>
       </View>
     </ScrollView>
   )

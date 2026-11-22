@@ -14,6 +14,8 @@ export type LibraryBook = {
     author: string;
     year: string | null;
     description: string | null;
+    cover_id: number | null;
+    isbn: string | null;
     status: ReadingStatus;
     added_at: string;
 };
