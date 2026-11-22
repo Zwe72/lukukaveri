@@ -17,6 +17,8 @@ export type LibraryBook = {
     cover_id: number | null;
     isbn: string | null;
     status: ReadingStatus;
+    notes: string | null;
+    rating: number | null;
     added_at: string;
 };
 
@@ -27,13 +29,15 @@ export async function addBookToLibrary(
 ): Promise<boolean> {
     const result = await db.runAsync(
         `INSERT OR IGNORE INTO library_books
-        (id, title, author, year, description, status)
-        VALUES(?, ?, ?, ?, ?, ?)`,
+        (id, title, author, year, description, cover_id, isbn, status)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
         book.id,
         book.title,
         book.author,
         book.year,
         book.description,
+        book.coverId ?? null,
+        book.isbn ?? null,
         'Lukulistalla'
     );
 
@@ -90,4 +94,32 @@ export async function removeBookFromLibrary(
     );
 
     return result.changes > 0; 
+}
+
+// Kirjan muistiinpanojen ja arvosanan päivittäminen
+export async function updateBookReview(
+    db: SQLiteDatabase,
+    bookId: string,
+    notes: string,
+    rating: number | null
+): Promise<boolean> {
+
+    // Tarkistetaan arvosanan kelvollisuus.
+    if (
+        rating !== null &&
+        (!Number.isInteger(rating) || rating < 1 || rating < 5)
+    ) {
+        throw new Error('Arvosanan pitää olla välillä 1-5.');
+    }
+
+    const result = await db.runAsync(
+        `UPDATE library_books
+        SET notes = ?, rating = ?
+         WHERE id = ?`,
+         notes.trim() || null,
+         rating,
+         bookId
+    );
+    
+    return result.changes > 0;
 }

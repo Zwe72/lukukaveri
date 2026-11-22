@@ -1,5 +1,6 @@
 import { Colors } from "@/constants/theme";
-import { useFocusEffect } from "expo-router";
+import { Image } from "expo-image";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useSQLiteContext } from "expo-sqlite";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from "react-native";
@@ -15,10 +16,19 @@ import {
 export default function LibraryScreen() {
   const db = useSQLiteContext();
 
+  const router = useRouter();
+
   const [books, setBooks] = useState<LibraryBook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [updatingBookId, setUpdateingBookId] = useState<string | null>(null);
+
+  const readingStatuses: ReadingStatus[] = [
+    'Lukulistalla',
+    'Kesken',
+    'Luettu',
+  ];
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
   const styles = createStyles(colors);
@@ -75,6 +85,8 @@ export default function LibraryScreen() {
     status: ReadingStatus
   ) => {
     try {
+      setUpdateingBookId(bookId);
+
       const updated = await updateBookStatus(db, bookId, status);
 
       if(updated) {
@@ -88,6 +100,8 @@ export default function LibraryScreen() {
       }
     } catch (error) {
       console.error('Lukutilan päivittäminen epäonnistui:', error);
+    } finally {
+      setUpdateingBookId(null);
     }
   };
 
@@ -139,14 +153,65 @@ export default function LibraryScreen() {
         <View style={styles.bookList}>
           {books.map((book) => (
             <View key={book.id} style={styles.bookCard}>
-              <View style={styles.bookCover}>
-                <Text style={styles.coverIcon}>📖</Text>
-              </View>
+              <Pressable
+                style={styles.bookCover}
+                onPress={() =>
+                  router.push({
+                    pathname: '/book/[id]',
+                    params: {
+                      id: book.id,
+                      title: book.title,
+                      author: book.author,
+                      year: book.year ?? '',
+                      coverId: book.cover_id != null
+                        ? String(book.cover_id)
+                        : '',
+                      isbn: book.isbn ?? '',
+                    },
+                  })
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Avaa kirjan ${book.title} tiedot`}
+              >
+                {book.cover_id ? (
+                  <Image
+                    source={{
+                      uri: `https://covers.openlibrary.org/b/id/${book.cover_id}-M.jpg`,
+                    }}
+                    style={styles.bookCoverImage}
+                    contentFit="contain"
+                    cachePolicy="disk"
+                    transition={150}
+                  />
+                ) : (
+                  <Text style={styles.coverIcon}>📖</Text>
+                )}
+              </Pressable>
 
               <View style={styles.bookInfo}>
-                <Text style={styles.bookTitle}>
-                  {book.title}
-                </Text>
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: '/book/[id]',
+                      params: {
+                        id: book.id,
+                        title: book.title,
+                        author: book.author,
+                        year: book.year ?? '',
+                        coverId: book.cover_id != null
+                          ? String(book.cover_id)
+                          : '',
+                        isbn: book.isbn ?? '',
+                      },
+                    })
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Avaa kirjan ${book.title} tiedot`}
+                >
+                  <Text style={styles.bookTitle}>
+                    {book.title}
+                  </Text>
+                </Pressable>
 
                 <Text style={styles.author}>
                   {book.author}
@@ -158,29 +223,43 @@ export default function LibraryScreen() {
                   </Text>
                 </View>
 
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  <Pressable
-                    style={styles.statusBadge}
-                    onPress={() => handleUpdateStatus(book.id, 'Lukulistalla')}
-                    >
-                      <Text style={styles.statusText}>Lukulistalla</Text>
-                    </Pressable>
+                {/* Lukutilan valinta */}
+                <Text style={styles.statusLabel}>
+                  Lukutila
+                </Text>
 
-                    <Pressable
-                      style={styles.statusBadge}
-                      onPress={() => handleUpdateStatus(book.id, 'Kesken')}
-                    >
-                      <Text style={styles.statusText}>Kesken</Text>
-                    </Pressable>
+                <View style={styles.statusOptions}>
+                  {readingStatuses.map((status) => {
+                    const isSelected = book.status === status;
 
-                    <Pressable
-                      style={styles.statusBadge}
-                      onPress={() => handleUpdateStatus(book.id, 'Luettu')}
-                    >
-                      <Text style={styles.statusText}>Luettu</Text>
-                    </Pressable>
-                  </View>
-                  
+                    return (
+                      <Pressable
+                        key={status}
+                        style={[
+                          styles.statusOption,
+                          isSelected && styles.statusOptionActive,
+                        ]}
+                        onPress={() => handleUpdateStatus(book.id, status)}
+                        disabled={updatingBookId === book.id}
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          selected: isSelected,
+                          disabled: updatingBookId === book.id,
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.statusOptionText,
+                            isSelected && styles.statusOptionTextActive,
+                          ]}
+                        >
+                          {status}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
                 {/* Kirjan poistaminen */}
                 <Pressable onPress={() => handleRemoveBook(book.id)}>
                   <Text>Poista</Text>
@@ -253,12 +332,15 @@ StyleSheet.create({
       borderColor: colors.border,
     },
     bookCover: {
-      width: 75,
-      height: 100,
-      backgroundColor: colors.backgroundSelected,
+      width: 90,
+      height: 130,
       borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
+      overflow: 'hidden',
+      backgroundColor: colors.backgroundElement,
+    },
+    bookCoverImage: {
+      width: '100%',
+      height: '100%',
     },
     coverIcon: {
       fontSize: 30,
@@ -287,6 +369,44 @@ StyleSheet.create({
       fontSize: 12,
       fontWeight: '600',
       color: colors.primary,
+    },
+    statusLabel: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+      marginTop: 8,
+    },
+
+    statusOptions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 7,
+      marginTop: 6,
+    },
+
+    statusOption: {
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+
+    statusOptionActive: {
+      backgroundColor: colors.backgroundSelected,
+      borderColor: colors.primary,
+    },
+
+    statusOptionText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '500',
+    },
+
+    statusOptionTextActive: {
+      color: colors.text,
+      fontWeight: '700',
     },
      emptyText: {
       fontSize: 14,

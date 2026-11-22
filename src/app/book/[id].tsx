@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useColorScheme,
   View
 } from "react-native";
@@ -18,7 +19,8 @@ import { Book } from "@/data/books";
 import {
   addBookToLibrary,
   getLibraryBookById,
-  removeBookFromLibrary
+  removeBookFromLibrary,
+  updateBookReview
 } from "@/data/library";
 import { getOpenLibraryWorkDetails } from "@/services/openLibrary";
 
@@ -53,6 +55,11 @@ export default function BookDetailsScreen() {
     const [isLoadingDetails, setIsLoadingDetails] = useState(true);
     const [detailsError, setDetailsError] = useState<string | null>(null);
 
+    const [notes, setNotes] = useState('');
+    const [rating, setRating] = useState<number | null>(null);
+
+    const [isSavingReview, setIsSavingReview] = useState(false);
+    const [reviewMessage, setReviewMessage] = useState('');
     const book: Book | null = id && title
       ? {
           id,
@@ -76,6 +83,14 @@ export default function BookDetailsScreen() {
           
           if (isActive) {
             setIsSaved(savedBook !== null);
+
+            if (savedBook) {
+              setNotes(savedBook.notes ?? '');
+              setRating(savedBook.rating ?? null);
+            } else {
+              setNotes('');
+              setRating(null);
+            }
           }
         } catch (error) {
           console.error('Kirjan tarkistaminen epäonnistui:', error);
@@ -93,6 +108,8 @@ export default function BookDetailsScreen() {
       if (!book || isSaving) return;
 
       try {
+        setIsSaving(true);
+        
         await addBookToLibrary(db, book);
         setIsSaved(true);
         setSaveMessage('Kirja lisättiin kirjahyllyyn!');
@@ -112,6 +129,33 @@ export default function BookDetailsScreen() {
         setIsSaved(false);
       } catch (error) {
         console.error('Kirjan poistaminen epäonnistui:', error)
+      }
+    };
+
+    const handleSaveReview = async () => {
+      if (!book || !isSaved || isSavingReview) return;
+
+      try {
+        setIsSavingReview(true);
+        setReviewMessage('');
+
+        await updateBookReview(
+          db,
+          book.id,
+          notes,
+          rating
+        );
+
+        setReviewMessage('Muistiinpanot ja arvosana tallennettu!');
+      } catch (error) {
+        console.error(
+          'Lukupäiväkirjan tallentaminen epäonnistui:',
+          error
+        );
+
+        setReviewMessage('Tallentaminen epäonnistui.');
+      } finally {
+        setIsSavingReview(false);
       }
     };
 
@@ -240,14 +284,109 @@ export default function BookDetailsScreen() {
                 </Text>
               </Pressable>
             )}
-
-            {saveMessage !== '' && (
-              <Text style={styles.saveMessage}>
-                {saveMessage}
+            
+            {/* Lukupäiväkirja */}
+            <View style={styles.reviewSection}>
+              <Text style={styles.reviewTitle}>
+                Oma lukupäiväkirja
               </Text>
-            )}
-        </ScrollView>
-    );
+
+              {isSaved ? (
+                <>
+                  {/* Arvosana */}
+                  <Text style={styles.reviewLabel}>
+                    Anna kirjalle arvosana
+                  </Text>
+
+                  <View style={styles.ratingContainer}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Pressable
+                        key={star}
+                        onPress={() => setRating(star)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Arvosana ${star} / 5`}
+                        accessibilityState={{
+                          selected: rating === star,
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.ratingStar,
+                            rating !== null &&
+                              star <= rating &&
+                              styles.ratingStarSelected,
+                          ]}
+                        >
+                          {rating !== null && star <= rating
+                            ? '★'
+                            : '☆'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+
+                  <Text style={styles.reviewHint}>
+                    {rating !== null
+                      ? `Valitsit ${rating} / 5 tähteä`
+                      : 'Et ole vielä antanut arvosanaa.'}
+                  </Text>
+
+                  {/* Muistiinpanot */}
+                  <Text style={styles.reviewLabel}>
+                    Omat ajatukset kirjasta
+                  </Text>
+
+                  <TextInput
+                    style={styles.notesInput}
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="Kirjoita tähän omia ajatuksiasi kirjasta..."
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                    textAlignVertical="top"
+                    maxLength={2000}
+                  />
+
+                  <Text style={styles.reviewHint}>
+                    {notes.length} / 2000 merkkiä
+                  </Text>
+
+                  {/* Tallennuspainike */}
+                  <Pressable
+                    style={styles.saveReviewButton}
+                    onPress={handleSaveReview}
+                    disabled={isSavingReview}
+                  >
+                    <Text style={styles.saveReviewButtonText}>
+                      {isSavingReview
+                        ? 'Tallennetaan...'
+                        : 'Tallenna lukupäiväkirja'}
+                    </Text>
+                  </Pressable>
+
+                  {reviewMessage !== '' && (
+                    <Text style={styles.reviewMessage}>
+                      {reviewMessage}
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.reviewHint}>
+                  Lisää kirja ensin kirjahyllyyn, jotta voit kirjoittaa
+                  siitä muistiinpanoja ja antaa sille arvosanan.
+                </Text>
+              )}
+            </View>
+
+      {/* Kirjan tallennuksen ilmoitus */}
+      {saveMessage !== '' && (
+        <Text style={styles.saveMessage}>
+          {saveMessage}
+        </Text>
+      )}
+
+    </ScrollView>
+  );
 }
 
 const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
@@ -320,5 +459,74 @@ coverPlaceholder: {
 coverPlaceholderText: {
   color: colors.textSecondary,
   fontSize: 14,
+},
+reviewSection: {
+  backgroundColor: colors.card,
+  padding: 18,
+  borderRadius: 16,
+  gap: 14,
+  marginTop: 12,
+},
+
+reviewTitle: {
+  color: colors.text,
+  fontSize: 21,
+  fontWeight: 'bold',
+},
+
+reviewLabel: {
+  color: colors.text,
+  fontSize: 15,
+  fontWeight: '600',
+},
+
+ratingContainer: {
+  flexDirection: 'row',
+  gap: 10,
+  alignItems: 'center',
+},
+
+ratingStar: {
+  fontSize: 36,
+  color: colors.textSecondary,
+},
+
+ratingStarSelected: {
+  color: colors.primary,
+},
+
+reviewHint: {
+  color: colors.textSecondary,
+  fontSize: 13,
+},
+
+notesInput: {
+  minHeight: 130,
+  backgroundColor: colors.backgroundElement,
+  color: colors.text,
+  borderRadius: 10,
+  padding: 12,
+  fontSize: 15,
+  lineHeight: 22,
+  textAlignVertical: 'top',
+},
+
+saveReviewButton: {
+  backgroundColor: colors.primary,
+  padding: 14,
+  borderRadius: 10,
+  alignItems: 'center',
+},
+
+saveReviewButtonText: {
+  color: colors.lightButtonText,
+  fontSize: 15,
+  fontWeight: '600',
+},
+
+reviewMessage: {
+  color: colors.textSecondary,
+  fontSize: 14,
+  textAlign: 'center',
 },
 })
