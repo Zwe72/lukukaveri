@@ -6,7 +6,9 @@ import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from "r
 
 import {
   getLibraryBooks,
+  ReadingStatus,
   removeBookFromLibrary,
+  updateBookStatus,
   type LibraryBook
 } from "@/data/library";
 
@@ -65,6 +67,27 @@ export default function LibraryScreen() {
       );
     } catch (error) {
       console.error('Kirjan poistaminen epäonnistui:', error);
+    }
+  };
+
+  const handleUpdateStatus = async (
+    bookId: string,
+    status: ReadingStatus
+  ) => {
+    try {
+      const updated = await updateBookStatus(db, bookId, status);
+
+      if(updated) {
+        setBooks((currentBooks) =>
+          currentBooks.map((book) =>
+            book.id === bookId
+              ? { ...book, status }
+              : book
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Lukutilan päivittäminen epäonnistui:', error);
     }
   };
 
@@ -135,6 +158,29 @@ export default function LibraryScreen() {
                   </Text>
                 </View>
 
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  <Pressable
+                    style={styles.statusBadge}
+                    onPress={() => handleUpdateStatus(book.id, 'Lukulistalla')}
+                    >
+                      <Text style={styles.statusText}>Lukulistalla</Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.statusBadge}
+                      onPress={() => handleUpdateStatus(book.id, 'Kesken')}
+                    >
+                      <Text style={styles.statusText}>Kesken</Text>
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.statusBadge}
+                      onPress={() => handleUpdateStatus(book.id, 'Luettu')}
+                    >
+                      <Text style={styles.statusText}>Luettu</Text>
+                    </Pressable>
+                  </View>
+                  
                 {/* Kirjan poistaminen */}
                 <Pressable onPress={() => handleRemoveBook(book.id)}>
                   <Text>Poista</Text>

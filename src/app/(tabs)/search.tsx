@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/theme';
-import { books } from '@/data/books';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -12,6 +12,10 @@ import {
   View
 } from 'react-native';
 
+import { searchOpenLibraryBooks } from '@/services/openLibrary';
+
+import type { Book } from '@/data/books';
+
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
 
@@ -20,96 +24,166 @@ export default function SearchScreen() {
   const styles = createStyles(colors);
   const router = useRouter();
 
+  const [searchResults, setSearchResults] = useState<Book[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   // Suodatetaan kirjoja hakusanan perusteella
-  const filteredBooks = books.filter((book) => {
-    const searchTerm = query.trim().toLowerCase();
+  useEffect(() => {
+    const searchTerm = query.trim();
 
-    return (
-      book.title.toLowerCase().includes(searchTerm) ||
-      book.author.toLowerCase().includes(searchTerm)
-    );
-  });
+    if (searchTerm.length < 2) {
+      setSearchResults([]);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
 
-  return (
-    <View style={styles.screen}>
+    const controller = new AbortController();
 
-      {/* Otsikko */}
-      <View style={styles.header}>
-        <Text style={styles.brand}>LUKUKAVERI</Text>
-        <Text style={styles.title}>Etsi kirjoja</Text>
-        <Text style={styles.subtitle}>
-          Löydä seuraava lukuelämyksesi.
-          </Text>
-      </View>
+    setIsLoading(true);
+    setError(null);
+    setSearchResults([]);
 
-      {/* Hakukenttä */}
-      <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>⌕</Text>
+    const timeoutId = setTimeout(async () => {
+      try {
+        const results = await searchOpenLibraryBooks(
+          searchTerm,
+          controller.signal
+        );
 
-        <TextInput
-          style={styles.input}
-          placeholder="Kirjan nimi tai kirjailija..."
-          placeholderTextColor={colors.textSecondary}
-          value={query}
-          onChangeText={setQuery}
-        />
-
-        {query.length > 0 && (
-          <Pressable onPress={() => setQuery('')}>
-            <Text style={styles.clearButton}>Tyhjennä</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {/* Hakutulokset */}
-      <Text style={styles.resultCount}>
-        Hakutulokset ({filteredBooks.length})
-      </Text>
-
-      <FlatList
-        data={filteredBooks}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => (
-          <View style={{ height: 12 }} />
-        )}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>
-            Kirjoja ei löytänyt. Kokeile toista hakusanaa.
-          </Text>
+        if (!controller.signal.aborted) {
+          setSearchResults(results);
         }
-        renderItem={({ item }) => (
-          <Pressable 
-            style={styles.bookCard}
-            onPress={() =>
-              router.push({
-                pathname: '/book/[id]',
-                params: { id: item.id },
-              })
-            }
-          >
-            <View style={styles.bookCover}>
-              <Text style={styles.coverIcon}>📖</Text>
-            </View>
+      }
+      catch (error) {
+        if (controller.signal.aborted) return;
 
-            <View style={styles.bookInfo}>
-              <Text style={styles.bookTitle}>
-                {item.title}
-              </Text>
+        console.error('Kirjastojen haku epäonnistui:', error);
 
-              <Text style={styles.author}>
-                {item.author}
-              </Text>
+        setError('Kirjojen hakeminen epäonnistui. Tarkista verkkoyhteys.');
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    }, 1000);
 
-              <Text style={styles.year}>
-                {item.year}
-              </Text>
-            </View>
-          </Pressable>
-        )}
-      />
-    </View>
-  );
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [query]);
+
+return (
+  <View style={styles.screen}>
+    <FlatList
+      data={searchResults}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={styles.listContent}
+      ListHeaderComponent={
+        <>
+          {/* Otsikko */}
+          <View style={styles.header}>
+            <Text style={styles.brand}>LUKUKAVERI</Text>
+            <Text style={styles.title}>Etsi kirjoja</Text>
+            <Text style={styles.subtitle}>
+              Löydä seuraava lukuelämyksesi.
+            </Text>
+          </View>
+
+          {/* Hakukenttä */}
+          <View style={styles.searchContainer}>
+            <Text style={styles.searchIcon}>⌕</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Kirjan nimi tai kirjailija..."
+              placeholderTextColor={colors.textSecondary}
+              value={query}
+              onChangeText={setQuery}
+            />
+
+            {query.length > 0 && (
+              <Pressable onPress={() => setQuery('')}>
+                <Text style={styles.clearButton}>Tyhjennä</Text>
+              </Pressable>
+            )}
+          </View>
+
+        {/* Hakutulokset */}
+        <Text style={styles.resultCount}>
+          Hakutulokset ({searchResults.length})
+        </Text>
+      </>
+    }
+    ItemSeparatorComponent={() => (
+      <View style={{ height: 12}} />
+    )}
+    ListEmptyComponent={
+      <Text style={styles.emptyText}>
+        {query.trim().length < 2
+          ? 'Kirjoita vähintään kaksi merkkiä.'
+          : isLoading
+            ? 'Haetaan kirjoja...'
+            : error
+              ? error
+              :'Kirjoja ei löytänyt. Kokeile toista hakusanaa.'}
+      </Text>
+    }
+    renderItem={({ item }) => (
+      <Pressable 
+        style={styles.bookCard}
+        onPress={() =>
+          router.push({
+            pathname: '/book/[id]',
+            params: {
+              id: item.id,
+              title: item.title,
+              author: item.author,
+              year: item.year ?? '',
+              coverId: item.coverId != null
+                ? String(item.coverId)
+                : '',
+              isbn: item.isbn ?? '',
+            },
+          })
+        }
+      >
+        <View style={styles.bookCover}>
+          {item.coverId ? (
+            <Image
+              source={{
+                uri: `https://covers.openlibrary.org/b/id/${item.coverId}-M.jpg`,
+              }}
+              style={styles.coverImage}
+              contentFit="contain"
+              cachePolicy="disk"
+              transition={150}
+            />
+          ) : (
+            <Text style={styles.coverIcon}>📖</Text>
+          )}
+        </View>
+
+          <View style={styles.bookInfo}>
+            <Text style={styles.bookTitle}>
+              {item.title}
+            </Text>
+
+            <Text style={styles.author}>
+              {item.author}
+            </Text>
+
+            <Text style={styles.year}>
+              {item.year ?? 'Julkaisuvuosi ei tiedossa'}
+            </Text>
+          </View>
+        </Pressable>
+      )}
+    />
+  </View>
+);
 }
 
 const createStyles = (
@@ -117,7 +191,7 @@ const createStyles = (
 ) =>
   StyleSheet.create({
     screen: {
-      flex: 1,
+      flexGrow: 1,
       backgroundColor: colors.background,
       padding: 24,
       paddingTop: 40,
@@ -220,5 +294,9 @@ const createStyles = (
       color: colors.textSecondary,
       textAlign: 'center',
       marginTop: 30,
+    },
+    coverImage: {
+      width: '100%',
+      height: '100%',
     },
   });

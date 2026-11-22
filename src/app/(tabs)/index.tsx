@@ -1,5 +1,8 @@
 import { Colors } from '@/constants/theme';
-import { useRouter } from 'expo-router';
+import { getLibraryBooks, LibraryBook } from '@/data/library';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 
 export default function HomeScreen() {
@@ -7,6 +10,51 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme === 'dark' ? 'dark' : 'light'];
   const styles = createStyles(colors);
+
+  const db = useSQLiteContext();
+
+  const [books, setBooks] = useState<LibraryBook[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      const loadBooks = async () => {
+        try {
+          setIsLoading(true);
+          setError(null);
+
+          const savedBooks = await getLibraryBooks(db);
+
+          if (isActive) {
+            setBooks(savedBooks);
+          }
+        } catch (error) {
+          console.error('Kirjojen hakeminen epäonnistui:', error);
+
+          if (isActive) {
+          setError('Kirjahyllyn lataaminen epäonnistui.');
+        }
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadBooks();
+
+    return () => {
+      isActive = false;
+    };
+  }, [db])
+);
+
+const currentlyReading = books.find(
+  (book) => book.status === 'Kesken'
+);
 
   return (
     <ScrollView
@@ -45,62 +93,86 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.bookCard}>
-        <View style={styles.bookCover}>
-          <Text style={styles.coverTitle}>
-            aaa
-          </Text>
-          <Text style={styles.coverAuthor}>
-            Esimerkkikirja
-          </Text>
-        </View>
-
-        <View style={styles.bookInfo}>
-          <Text style={styles.bookTitle}>
-            aaa
-          </Text>
-          <Text style={styles.author}>
-            Esimerkkikirjailija
-          </Text>
-
-          <Text style={styles.status}>
-            Kesken
-          </Text>
-          
-          <Text style={styles.progressText}>
-            Lukeminen edennyt 55 %
-          </Text>
-
-          <View style={styles.progressBar}>
-            <View style={styles.progressFill} />
-            </View>
-          </View>
-        </View>
-
-        {/* Kirjahakuun ohjaaminen */}
-        <View style={styles.discoverCard}>
-          <Text style={styles.sectionTitle}>
-            Löydä uutta luettavaa
-          </Text>
-
-          <Text style={styles.discoverText}>
-            Etsi seuraava suosikkikirjasi ja lisää se
-            oman kirjahyllyysi.
-          </Text>
-
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => router.push('/search')}
-          >
-            <Text style={styles.primaryButtonText}>
-              Etsi kirjoja
+      {/* Kirjojen lataaminen */}
+      {isLoading ? (
+        <Text style={styles.progressText}>
+          Ladataan kirajhyllyä...
+        </Text>
+      ) : error ? (
+        <Text style={styles.progressText}>
+          {error}
+        </Text>
+      ) : currentlyReading ? (
+        <Pressable
+        style={styles.bookCard}
+          onPress={() =>
+            router.push({
+              pathname: '/book/[id]',
+              params: {
+                id: currentlyReading.id,
+                title: currentlyReading.title,
+                author: currentlyReading.author,
+                year: currentlyReading.year ?? '',
+                coverId: '',
+                isbn: '',
+              },
+            })
+          }
+        >
+          <View style={styles.bookCover}>
+            <Text style={styles.coverTitle}>
+            📖
             </Text>
-          </Pressable>
-        </View>
+          </View>
 
+          <View style={styles.bookInfo}>
+            <Text style={styles.bookTitle}>
+              {currentlyReading.title}
+            </Text>
+
+            <Text style={styles.author}>
+              {currentlyReading.author}
+            </Text>
+
+            <Text style={styles.status}>
+              {currentlyReading.status}
+            </Text>
+
+            <Text style={styles.progressText}>
+              Avaa kirja ja jatka lukemista →
+            </Text>
+          </View>
+        </Pressable> 
+      ) : (
+      <Text style={styles.progressText}>
+        Sinulla ei ole tällä hetkellä keskeneräisiä kirjoja.
+        Lisää kirja kirjahyllyyn ja aloita lukeminen!
+      </Text>
+    )}
+
+      {/* Löydä uutta luettavaa */}
+      <View style={styles.discoverCard}>
+        <Text style={styles.sectionTitle}>
+          Löydä uutta luettavaa
+        </Text>
+
+        <Text style={styles.discoverText}>
+          Etsi seuraava suosikkikirjasi ja lisää se
+          omaan kirjahyllyysi.
+        </Text>
+
+        <Pressable
+          style={styles.primaryButton}
+          onPress={() => router.push('/search')}
+        >
+          <Text style={styles.primaryButtonText}>
+            Etsi kirjoja
+          </Text>
+        </Pressable>
+      </View>
     </ScrollView>
-  );
-}
+  )
+};
 
 
 const createStyles = (colors: typeof Colors.light | typeof Colors.dark) =>
